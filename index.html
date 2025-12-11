@@ -1,0 +1,142 @@
+import React, { useState, useEffect } from 'react';
+import Tesseract from 'tesseract.js';
+
+// تعريف شكل البيانات
+interface Dhikr {
+  id: string;
+  text: string;
+  count: number; // عدد مرات التكرار
+  categoryId: string; // "morning", "evening", or custom ID
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
+const AddDhikrScanner = () => {
+  // الحالة (State)
+  const [image, setImage] = useState<File | null>(null);
+  const [extractedText, setExtractedText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('morning');
+  const [categories, setCategories] = useState<Category[]>([
+    { id: 'morning', name: 'أذكار الصباح' },
+    { id: 'evening', name: 'أذكار المساء' },
+    // يمكن إضافة قوائم أخرى هنا
+  ]);
+  
+  // دالة التعامل مع اختيار الصورة
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImage(e.target.files[0]);
+      processImage(e.target.files[0]);
+    }
+  };
+
+  // دالة تحويل الصورة لنص (OCR)
+  const processImage = async (imgFile: File) => {
+    setIsLoading(true);
+    try {
+      const { data: { text } } = await Tesseract.recognize(
+        imgFile,
+        'ara', // اللغة العربية (ara)
+        { logger: m => console.log(m) }
+      );
+      setExtractedText(text); // وضع النص المستخرج في الحقل للتعديل
+    } catch (error) {
+      console.error("Error scanning:", error);
+      alert("حدث خطأ أثناء قراءة الصورة");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // دالة حفظ الذكر
+  const saveDhikr = () => {
+    if (!extractedText.trim()) return;
+
+    const newDhikr: Dhikr = {
+      id: Date.now().toString(),
+      text: extractedText,
+      count: 1, // افتراضي
+      categoryId: selectedCategory
+    };
+
+    // هنا كود الحفظ في LocalStorage
+    const existingDhikr = JSON.parse(localStorage.getItem('my_athkar') || '[]');
+    const updatedDhikr = [...existingDhikr, newDhikr];
+    localStorage.setItem('my_athkar', JSON.stringify(updatedDhikr));
+
+    alert('تمت إضافة الذكر بنجاح!');
+    // إعادة تعيين الحقول
+    setExtractedText('');
+    setImage(null);
+  };
+
+  // دالة إضافة قائمة جديدة
+  const addNewCategory = () => {
+    const name = prompt("أدخل اسم القائمة الجديدة:");
+    if (name) {
+      const newCat = { id: Date.now().toString(), name };
+      setCategories([...categories, newCat]);
+    }
+  };
+
+  return (
+    <div className="p-4 dir-rtl">
+      <h2 className="text-xl font-bold mb-4">إضافة ذكر من صورة</h2>
+
+      {/* رفع الصورة */}
+      <input 
+        type="file" 
+        accept="image/*" 
+        onChange={handleImageUpload} 
+        className="mb-4 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+      />
+
+      {/* مؤشر التحميل */}
+      {isLoading && <p className="text-blue-600">جاري قراءة النص من الصورة... ⏳</p>}
+
+      {/* عرض وتعديل النص المستخرج */}
+      <textarea
+        className="w-full p-2 border rounded mb-4 text-right"
+        rows={5}
+        value={extractedText}
+        onChange={(e) => setExtractedText(e.target.value)}
+        placeholder="النص المستخرج سيظهر هنا..."
+      />
+
+      {/* اختيار القائمة */}
+      <div className="flex gap-2 mb-4 items-center">
+        <select 
+          value={selectedCategory} 
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="p-2 border rounded flex-grow"
+        >
+          {categories.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
+        
+        <button 
+          onClick={addNewCategory}
+          className="bg-gray-200 p-2 rounded"
+        >
+          + قائمة جديدة
+        </button>
+      </div>
+
+      {/* زر الحفظ */}
+      <button 
+        onClick={saveDhikr}
+        disabled={isLoading || !extractedText}
+        className="w-full bg-green-600 text-white p-3 rounded font-bold disabled:bg-gray-400"
+      >
+        حفظ الذكر
+      </button>
+    </div>
+  );
+};
+
+export default AddDhikrScanner;
