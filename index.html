@@ -1,142 +1,143 @@
-import React, { useState, useEffect } from 'react';
-import Tesseract from 'tesseract.js';
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق حصني</title>
+    
+    <!-- هذه الروابط بديلة عن تحميل الملفات على جهازك -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
-// تعريف شكل البيانات
-interface Dhikr {
-  id: string;
-  text: string;
-  count: number; // عدد مرات التكرار
-  categoryId: string; // "morning", "evening", or custom ID
-}
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+    </style>
+</head>
+<body>
 
-interface Category {
-  id: string;
-  name: string;
-}
+    <div id="root"></div>
 
-const AddDhikrScanner = () => {
-  // الحالة (State)
-  const [image, setImage] = useState<File | null>(null);
-  const [extractedText, setExtractedText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('morning');
-  const [categories, setCategories] = useState<Category[]>([
-    { id: 'morning', name: 'أذكار الصباح' },
-    { id: 'evening', name: 'أذكار المساء' },
-    // يمكن إضافة قوائم أخرى هنا
-  ]);
-  
-  // دالة التعامل مع اختيار الصورة
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImage(e.target.files[0]);
-      processImage(e.target.files[0]);
-    }
-  };
+    <script type="text/babel">
+        // هنا الكود بتاعك بالظبط (React Logic)
+        const { useState, useEffect } = React;
 
-  // دالة تحويل الصورة لنص (OCR)
-  const processImage = async (imgFile: File) => {
-    setIsLoading(true);
-    try {
-      const { data: { text } } = await Tesseract.recognize(
-        imgFile,
-        'ara', // اللغة العربية (ara)
-        { logger: m => console.log(m) }
-      );
-      setExtractedText(text); // وضع النص المستخرج في الحقل للتعديل
-    } catch (error) {
-      console.error("Error scanning:", error);
-      alert("حدث خطأ أثناء قراءة الصورة");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        const AddDhikrScanner = () => {
+            // المتغيرات (نفس اللي كانت عندك)
+            const [extractedText, setExtractedText] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [showScanner, setShowScanner] = useState(false);
+            const [morningAthkar, setMorningAthkar] = useState([]);
+            const [eveningAthkar, setEveningAthkar] = useState([]);
 
-  // دالة حفظ الذكر
-  const saveDhikr = () => {
-    if (!extractedText.trim()) return;
+            // تحميل البيانات عند الفتح
+            useEffect(() => {
+                const saved = JSON.parse(localStorage.getItem('my_athkar') || '[]');
+                setMorningAthkar(saved.filter(a => a.categoryId === 'morning'));
+                setEveningAthkar(saved.filter(a => a.categoryId === 'evening'));
+            }, [showScanner]);
 
-    const newDhikr: Dhikr = {
-      id: Date.now().toString(),
-      text: extractedText,
-      count: 1, // افتراضي
-      categoryId: selectedCategory
-    };
+            // دالة الصور
+            const handleImageUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setIsLoading(true);
+                setShowScanner(true);
+                try {
+                    const { data: { text } } = await Tesseract.recognize(file, 'ara');
+                    setExtractedText(text);
+                } catch (err) {
+                    alert("خطأ في القراءة، حاول مرة أخرى");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
 
-    // هنا كود الحفظ في LocalStorage
-    const existingDhikr = JSON.parse(localStorage.getItem('my_athkar') || '[]');
-    const updatedDhikr = [...existingDhikr, newDhikr];
-    localStorage.setItem('my_athkar', JSON.stringify(updatedDhikr));
+            // دالة الحفظ
+            const saveDhikr = (category) => {
+                if (!extractedText.trim()) return;
+                const newDhikr = { id: Date.now(), text: extractedText, categoryId: category };
+                const existing = JSON.parse(localStorage.getItem('my_athkar') || '[]');
+                localStorage.setItem('my_athkar', JSON.stringify([...existing, newDhikr]));
+                alert("تم الحفظ في القائمة!");
+                setExtractedText('');
+                setShowScanner(false);
+            };
 
-    alert('تمت إضافة الذكر بنجاح!');
-    // إعادة تعيين الحقول
-    setExtractedText('');
-    setImage(null);
-  };
+            // --- التصميم (الواجهة) ---
+            if (showScanner) {
+                return (
+                    <div className="min-h-screen bg-gray-50 p-4 flex flex-col items-center justify-center">
+                        <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-lg">
+                            <button onClick={() => setShowScanner(false)} className="mb-4 text-gray-500 font-bold">
+                                <i className="fas fa-arrow-right ml-2"></i> رجوع
+                            </button>
+                            <h2 className="text-xl font-bold mb-4 text-center text-gray-800">النص المستخرج من الصورة</h2>
+                            
+                            {isLoading ? (
+                                <div className="text-center py-10">
+                                    <p className="text-green-600 animate-pulse font-bold">جاري تحليل الصورة... ⏳</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <textarea 
+                                        className="w-full p-4 border-2 border-green-100 rounded-xl mb-4 h-48 text-right focus:border-green-500 outline-none"
+                                        value={extractedText}
+                                        onChange={(e) => setExtractedText(e.target.value)}
+                                    ></textarea>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => saveDhikr('morning')} className="bg-orange-100 text-orange-600 py-3 rounded-xl font-bold hover:bg-orange-200">أذكار الصباح ☀️</button>
+                                        <button onClick={() => saveDhikr('evening')} className="bg-blue-100 text-blue-600 py-3 rounded-xl font-bold hover:bg-blue-200">أذكار المساء 🌙</button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
 
-  // دالة إضافة قائمة جديدة
-  const addNewCategory = () => {
-    const name = prompt("أدخل اسم القائمة الجديدة:");
-    if (name) {
-      const newCat = { id: Date.now().toString(), name };
-      setCategories([...categories, newCat]);
-    }
-  };
+            return (
+                <div className="min-h-screen bg-white p-6 flex flex-col items-center font-sans text-gray-800">
+                    <header className="text-center mt-10 mb-8">
+                        <h1 className="text-4xl font-extrabold text-green-600 mb-2">حصني</h1>
+                        <p className="text-gray-500">رفيقك اليومي للأذكار</p>
+                    </header>
 
-  return (
-    <div className="p-4 dir-rtl">
-      <h2 className="text-xl font-bold mb-4">إضافة ذكر من صورة</h2>
+                    <div className="grid grid-cols-2 gap-4 w-full max-w-md mb-8">
+                        <div className="bg-blue-50 p-6 rounded-3xl text-center cursor-pointer hover:bg-blue-100 transition">
+                            <i className="fas fa-moon text-3xl text-blue-500 mb-2 block"></i>
+                            <span className="font-bold text-blue-800">المساء</span>
+                            <div className="text-xs text-blue-400 mt-1">{eveningAthkar.length} أذكار</div>
+                        </div>
+                        <div className="bg-orange-50 p-6 rounded-3xl text-center cursor-pointer hover:bg-orange-100 transition">
+                            <i className="fas fa-sun text-3xl text-orange-500 mb-2 block"></i>
+                            <span className="font-bold text-orange-800">الصباح</span>
+                            <div className="text-xs text-orange-400 mt-1">{morningAthkar.length} أذكار</div>
+                        </div>
+                    </div>
 
-      {/* رفع الصورة */}
-      <input 
-        type="file" 
-        accept="image/*" 
-        onChange={handleImageUpload} 
-        className="mb-4 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-      />
+                    <div className="w-full max-w-md relative group cursor-pointer">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                        <div className="relative bg-white border border-green-100 p-6 rounded-2xl flex items-center justify-between shadow-sm">
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-800">إضافة ذكر جديد</h3>
+                                <p className="text-sm text-gray-400">صور الصفحة وسنحولها لنص</p>
+                            </div>
+                            <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center text-green-600">
+                                <i className="fas fa-camera text-xl"></i>
+                            </div>
+                            <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-      {/* مؤشر التحميل */}
-      {isLoading && <p className="text-blue-600">جاري قراءة النص من الصورة... ⏳</p>}
-
-      {/* عرض وتعديل النص المستخرج */}
-      <textarea
-        className="w-full p-2 border rounded mb-4 text-right"
-        rows={5}
-        value={extractedText}
-        onChange={(e) => setExtractedText(e.target.value)}
-        placeholder="النص المستخرج سيظهر هنا..."
-      />
-
-      {/* اختيار القائمة */}
-      <div className="flex gap-2 mb-4 items-center">
-        <select 
-          value={selectedCategory} 
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="p-2 border rounded flex-grow"
-        >
-          {categories.map(cat => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
-          ))}
-        </select>
-        
-        <button 
-          onClick={addNewCategory}
-          className="bg-gray-200 p-2 rounded"
-        >
-          + قائمة جديدة
-        </button>
-      </div>
-
-      {/* زر الحفظ */}
-      <button 
-        onClick={saveDhikr}
-        disabled={isLoading || !extractedText}
-        className="w-full bg-green-600 text-white p-3 rounded font-bold disabled:bg-gray-400"
-      >
-        حفظ الذكر
-      </button>
-    </div>
-  );
-};
-
-export default AddDhikrScanner;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AddDhikrScanner />);
+    </script>
+</body>
+</html>
